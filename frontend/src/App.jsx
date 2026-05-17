@@ -115,7 +115,7 @@ export default function App() {
       setError("");
       setResult(null);
 
-      const res = await axios.post("http://127.0.0.1:8000/analyze/url", {
+      const res = await axios.post("https://codecanavs-ai.onrender.com/analyze", {
         url,
       });
 
