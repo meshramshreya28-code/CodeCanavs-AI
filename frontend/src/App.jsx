@@ -1,16 +1,30 @@
 import { PieChart, Pie, Cell, ResponsiveContainer } from "recharts";
 import { useState, useEffect, useRef } from "react";
 import axios from "axios";
-import { motion } from "framer-motion";
+import { motion, AnimatePresence } from "framer-motion";
 import "./App.css";
+
+const BACKEND_URL = "https://codecanavs-ai.onrender.com";
+
+const LOADING_STEPS = [
+  { icon: "🔌", text: "Waking up the server..." },
+  { icon: "🌐", text: "Fetching your website..." },
+  { icon: "📸", text: "Taking a screenshot..." },
+  { icon: "🎨", text: "Analyzing UI layout & colors..." },
+  { icon: "🧠", text: "Scoring UX patterns with AI..." },
+  { icon: "📊", text: "Preparing your report..." },
+];
 
 export default function App() {
   const [url, setUrl] = useState("");
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [loadingStep, setLoadingStep] = useState(0);
   const [error, setError] = useState("");
   const [history, setHistory] = useState([]);
+  const [backendReady, setBackendReady] = useState(false);
   const canvasRef = useRef(null);
+  const loadingIntervalRef = useRef(null);
 
   const chartData = result
     ? [
@@ -19,6 +33,23 @@ export default function App() {
       ]
     : [];
 
+  // ── Keep-alive ping every 10 minutes to prevent cold starts ──
+  useEffect(() => {
+    const ping = async () => {
+      try {
+        await fetch(`${BACKEND_URL}/`);
+        setBackendReady(true);
+      } catch {
+        // silent — backend might just be waking up
+      }
+    };
+
+    ping(); // ping immediately on load
+    const keepAlive = setInterval(ping, 10 * 60 * 1000); // every 10 min
+    return () => clearInterval(keepAlive);
+  }, []);
+
+  // ── Particle canvas background ──
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -71,9 +102,7 @@ export default function App() {
       particles.forEach((p, idx) => {
         p.update();
         p.draw();
-        if (p.life <= 0) {
-          particles[idx] = new Particle();
-        }
+        if (p.life <= 0) particles[idx] = new Particle();
       });
 
       for (let i = 0; i < particles.length; i++) {
@@ -112,33 +141,41 @@ export default function App() {
 
     try {
       setLoading(true);
+      setLoadingStep(0);
       setError("");
       setResult(null);
 
-      const res = await axios.post("https://codecanavs-ai.onrender.com/analyze/url", {
-        url,
-      });
+      // Cycle through loading messages every 6 seconds
+      loadingIntervalRef.current = setInterval(() => {
+        setLoadingStep((prev) =>
+          prev < LOADING_STEPS.length - 1 ? prev + 1 : prev
+        );
+      }, 6000);
+
+      const res = await axios.post(`${BACKEND_URL}/analyze/url`, { url });
 
       setResult(res.data);
-
-      setHistory((prev) => [
-        {
-          name: url,
-          result: res.data,
-        },
-        ...prev,
-      ]);
+      setHistory((prev) => [{ name: url, result: res.data }, ...prev]);
     } catch (err) {
-      console.log(err);
-      setError("Failed to analyze website. Check backend.");
+      console.error(err);
+      setError(
+        err.code === "ERR_NETWORK"
+          ? "Backend is still waking up. Please wait 30 seconds and try again."
+          : "Failed to analyze website. Check the URL and try again."
+      );
     } finally {
+      clearInterval(loadingIntervalRef.current);
       setLoading(false);
+      setLoadingStep(0);
     }
+  };
+
+  const handleKeyDown = (e) => {
+    if (e.key === "Enter") analyzeWebsite();
   };
 
   return (
     <div style={styles.container}>
-      
       <div className="animated-bg"></div>
       <div className="background-grid"></div>
       <div className="scene">
@@ -170,121 +207,180 @@ export default function App() {
       </div>
 
       <div className="content">
-      <motion.h1 style={styles.title}>
-        🚀 CodeCanvas AI
-      </motion.h1>
+        <motion.h1 style={styles.title}>🚀 CodeCanvas AI</motion.h1>
 
-      <p style={styles.subtitle}>UI/UX Analyzer powered by AI</p>
+        <p style={styles.subtitle}>UI/UX Analyzer powered by AI</p>
 
-      {/* INPUT */}
-      <motion.div style={styles.card}>
-        <input
-          style={styles.input}
-          type="text"
-          placeholder="Enter website URL..."
-          value={url}
-          onChange={(e) => setUrl(e.target.value)}
-        />
-
-        <button style={styles.button} onClick={analyzeWebsite}>
-          Analyze
-        </button>
-      </motion.div>
-
-      {/* LOADING */}
-      {loading && (
-        <div style={styles.loading}>
-          <div className="loader"></div>
-          <p>Analyzing UI...</p>
+        {/* Backend status indicator */}
+        <div style={styles.statusDot}>
+          <span
+            style={{
+              ...styles.dot,
+              background: backendReady ? "#22c55e" : "#f59e0b",
+              boxShadow: backendReady
+                ? "0 0 6px #22c55e"
+                : "0 0 6px #f59e0b",
+            }}
+          />
+          <span style={styles.statusText}>
+            {backendReady ? "Backend ready" : "Connecting to backend..."}
+          </span>
         </div>
-      )}
 
-      {/* ERROR */}
-      {error && <p style={styles.error}>{error}</p>}
-
-      {/* RESULT */}
-      {result && (
-        <motion.div style={styles.resultCard}>
-          <h2>📊 Analysis Result</h2>
-          {result.analysis_mode && (
-            <p style={styles.modeBadge}>
-              {result.analysis_mode === "fallback"
-                ? "Fallback heuristic analysis used"
-                : "AI analysis used"}
-            </p>
-          )}
-
-          <div style={styles.grid}>
-            <div style={styles.box}>
-              <h3>UI Score</h3>
-              <p>{result.ui_score}</p>
-            </div>
-
-            <div style={styles.box}>
-              <h3>UX Score</h3>
-              <p>{result.ux_score}</p>
-            </div>
-          </div>
-
-          <div style={styles.summaryBox}>
-            <p style={styles.summary}>
-              <b style={styles.summaryLabel}>📝 Summary:</b> {result.summary}
-            </p>
-          </div>
-
-          <div style={styles.suggestionsBox}>
-            <h3 style={styles.suggestionsTitle}>💡 Suggestions</h3>
-            <ul style={styles.suggestionsList}>
-              {result.suggestions?.map((s, i) => (
-                <li key={i} style={styles.suggestionItem}>{s}</li>
-              ))}
-            </ul>
-          </div>
-
-          {/* CHART FIXED */}
-          <div style={styles.chartBox}>
-            <h3>Score Graph</h3>
-
-            <ResponsiveContainer width="100%" height={260}>
-              <PieChart>
-                <Pie
-                  data={chartData}
-                  dataKey="value"
-                  outerRadius={90}
-                  label
-                >
-                  <Cell fill="#4f46e5" />
-                  <Cell fill="#22c55e" />
-                </Pie>
-              </PieChart>
-            </ResponsiveContainer>
-          </div>
+        {/* INPUT */}
+        <motion.div style={styles.card}>
+          <input
+            style={styles.input}
+            type="text"
+            placeholder="Enter website URL..."
+            value={url}
+            onChange={(e) => setUrl(e.target.value)}
+            onKeyDown={handleKeyDown}
+            disabled={loading}
+          />
+          <button
+            style={{
+              ...styles.button,
+              opacity: loading ? 0.6 : 1,
+              cursor: loading ? "not-allowed" : "pointer",
+            }}
+            onClick={analyzeWebsite}
+            disabled={loading}
+          >
+            {loading ? "Analyzing..." : "Analyze"}
+          </button>
         </motion.div>
-      )}
 
-      {/* HISTORY */}
-      {history.length > 0 && (
-        <div style={styles.history}>
-          <h2>History</h2>
+        {/* LOADING — progressive steps */}
+        <AnimatePresence>
+          {loading && (
+            <motion.div
+              style={styles.loadingCard}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+            >
+              <div className="loader" style={{ margin: "0 auto 16px" }}></div>
 
-          {history.map((item, i) => (
-            <div key={i} style={styles.historyCard}>
-              <b>{item.name}</b>
-              <p>
-                UI: {item.result.ui_score} | UX: {item.result.ux_score}
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={loadingStep}
+                  initial={{ opacity: 0, y: 8 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -8 }}
+                  transition={{ duration: 0.4 }}
+                  style={styles.loadingStep}
+                >
+                  <span style={styles.loadingIcon}>
+                    {LOADING_STEPS[loadingStep].icon}
+                  </span>
+                  <span>{LOADING_STEPS[loadingStep].text}</span>
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Step progress dots */}
+              <div style={styles.stepDots}>
+                {LOADING_STEPS.map((_, i) => (
+                  <div
+                    key={i}
+                    style={{
+                      ...styles.stepDot,
+                      background:
+                        i <= loadingStep ? "#38bdf8" : "rgba(56,189,248,0.2)",
+                      transform: i === loadingStep ? "scale(1.3)" : "scale(1)",
+                    }}
+                  />
+                ))}
+              </div>
+
+              <p style={styles.loadingHint}>
+                This may take 30–60 seconds on first run
+              </p>
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        {/* ERROR */}
+        {error && <p style={styles.error}>{error}</p>}
+
+        {/* RESULT */}
+        {result && (
+          <motion.div
+            style={styles.resultCard}
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+          >
+            <h2>📊 Analysis Result</h2>
+            {result.analysis_mode && (
+              <p style={styles.modeBadge}>
+                {result.analysis_mode === "fallback"
+                  ? "Fallback heuristic analysis used"
+                  : "AI analysis used"}
+              </p>
+            )}
+
+            <div style={styles.grid}>
+              <div style={styles.box}>
+                <h3>UI Score</h3>
+                <p>{result.ui_score}</p>
+              </div>
+              <div style={styles.box}>
+                <h3>UX Score</h3>
+                <p>{result.ux_score}</p>
+              </div>
+            </div>
+
+            <div style={styles.summaryBox}>
+              <p style={styles.summary}>
+                <b style={styles.summaryLabel}>📝 Summary:</b> {result.summary}
               </p>
             </div>
-          ))}
-        </div>
-      )}
 
-      {/* FOOTER */}
-      <div style={styles.footer}>
-        Built with ❤️ by Shreya Meshram
+            <div style={styles.suggestionsBox}>
+              <h3 style={styles.suggestionsTitle}>💡 Suggestions</h3>
+              <ul style={styles.suggestionsList}>
+                {result.suggestions?.map((s, i) => (
+                  <li key={i} style={styles.suggestionItem}>
+                    {s}
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div style={styles.chartBox}>
+              <h3>Score Graph</h3>
+              <ResponsiveContainer width="100%" height={260}>
+                <PieChart>
+                  <Pie data={chartData} dataKey="value" outerRadius={90} label>
+                    <Cell fill="#4f46e5" />
+                    <Cell fill="#22c55e" />
+                  </Pie>
+                </PieChart>
+              </ResponsiveContainer>
+            </div>
+          </motion.div>
+        )}
+
+        {/* HISTORY */}
+        {history.length > 0 && (
+          <div style={styles.history}>
+            <h2>History</h2>
+            {history.map((item, i) => (
+              <div key={i} style={styles.historyCard}>
+                <b>{item.name}</b>
+                <p>
+                  UI: {item.result.ui_score} | UX: {item.result.ux_score}
+                </p>
+              </div>
+            ))}
+          </div>
+        )}
+
+        {/* FOOTER */}
+        <div style={styles.footer}>Built with ❤️ by Shreya Meshram</div>
       </div>
     </div>
-  </div>
-);
+  );
 }
 
 /* ================= STYLES ================= */
@@ -299,19 +395,34 @@ const styles = {
     position: "relative",
     overflow: "hidden",
   },
-
   title: {
     fontSize: "34px",
     fontWeight: "bold",
     fontFamily: "'Courier New', monospace",
     textShadow: "0 0 10px rgba(56, 189, 248, 0.5)",
   },
-
   subtitle: {
     color: "#94a3b8",
-    marginBottom: "20px",
+    marginBottom: "8px",
   },
-
+  statusDot: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "6px",
+    marginBottom: "18px",
+  },
+  dot: {
+    width: "8px",
+    height: "8px",
+    borderRadius: "50%",
+    display: "inline-block",
+    transition: "all 0.5s ease",
+  },
+  statusText: {
+    fontSize: "12px",
+    color: "#64748b",
+  },
   card: {
     display: "flex",
     justifyContent: "center",
@@ -323,7 +434,6 @@ const styles = {
     borderRadius: "12px",
     maxWidth: "600px",
   },
-
   input: {
     flex: 1,
     minWidth: "220px",
@@ -332,7 +442,6 @@ const styles = {
     border: "none",
     outline: "none",
   },
-
   button: {
     padding: "12px 20px",
     borderRadius: "8px",
@@ -340,8 +449,46 @@ const styles = {
     cursor: "pointer",
     background: "#38bdf8",
     fontWeight: "bold",
+    transition: "opacity 0.2s",
   },
-
+  loadingCard: {
+    margin: "0 auto 20px",
+    padding: "24px 20px",
+    background: "#1e293b",
+    borderRadius: "12px",
+    maxWidth: "420px",
+    border: "1px solid rgba(56,189,248,0.2)",
+  },
+  loadingStep: {
+    display: "flex",
+    alignItems: "center",
+    justifyContent: "center",
+    gap: "10px",
+    fontSize: "15px",
+    color: "#cbd5e1",
+    marginBottom: "16px",
+    minHeight: "28px",
+  },
+  loadingIcon: {
+    fontSize: "20px",
+  },
+  stepDots: {
+    display: "flex",
+    justifyContent: "center",
+    gap: "6px",
+    marginBottom: "12px",
+  },
+  stepDot: {
+    width: "7px",
+    height: "7px",
+    borderRadius: "50%",
+    transition: "all 0.4s ease",
+  },
+  loadingHint: {
+    fontSize: "12px",
+    color: "#475569",
+    margin: 0,
+  },
   modeBadge: {
     marginTop: "12px",
     marginBottom: "14px",
@@ -353,15 +500,14 @@ const styles = {
     fontWeight: "600",
     fontSize: "14px",
   },
-
-  loading: {
-    marginTop: "20px",
-  },
-
   error: {
     color: "#ef4444",
+    background: "rgba(239,68,68,0.1)",
+    padding: "12px 20px",
+    borderRadius: "8px",
+    maxWidth: "500px",
+    margin: "0 auto 20px",
   },
-
   resultCard: {
     marginTop: "30px",
     padding: "20px",
@@ -371,19 +517,16 @@ const styles = {
     marginLeft: "auto",
     marginRight: "auto",
   },
-
   grid: {
     display: "grid",
     gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
     gap: "15px",
   },
-
   box: {
     background: "#334155",
     padding: "15px",
     borderRadius: "10px",
   },
-
   summaryBox: {
     marginTop: "20px",
     marginBottom: "20px",
@@ -395,7 +538,6 @@ const styles = {
     marginLeft: "auto",
     marginRight: "auto",
   },
-
   summary: {
     margin: "0",
     lineHeight: "1.6",
@@ -403,13 +545,11 @@ const styles = {
     color: "#cbd5e1",
     textAlign: "left",
   },
-
   summaryLabel: {
     color: "#38bdf8",
     marginRight: "8px",
     fontWeight: "700",
   },
-
   suggestionsBox: {
     marginTop: "20px",
     marginBottom: "20px",
@@ -421,7 +561,6 @@ const styles = {
     marginLeft: "auto",
     marginRight: "auto",
   },
-
   suggestionsTitle: {
     margin: "0 0 14px 0",
     fontSize: "16px",
@@ -429,14 +568,12 @@ const styles = {
     color: "#22c55e",
     textAlign: "left",
   },
-
   suggestionsList: {
     listStyle: "none",
     padding: "0",
     margin: "0",
     textAlign: "left",
   },
-
   suggestionItem: {
     padding: "10px 0",
     paddingLeft: "24px",
@@ -446,15 +583,12 @@ const styles = {
     lineHeight: "1.5",
     borderBottom: "1px solid rgba(148, 163, 184, 0.2)",
   },
-
   chartBox: {
     marginTop: "20px",
   },
-
   history: {
     marginTop: "30px",
   },
-
   historyCard: {
     background: "#0f172a",
     border: "1px solid #334155",
@@ -464,7 +598,6 @@ const styles = {
     margin: "10px auto",
     textAlign: "left",
   },
-
   footer: {
     marginTop: "40px",
     padding: "15px",
