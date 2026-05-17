@@ -115,7 +115,7 @@ export default function App() {
       setError("");
       setResult(null);
 
-      const res = await axios.post("https://codecanavs-ai.onrender.com/analyze", {
+      const res = await axios.post("https://codecanavs-ai.onrender.com/analyze/url", {
         url,
       });
 
