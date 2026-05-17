@@ -79,7 +79,7 @@ http://127.0.0.1:8000
 
 **Build Command:**
 ```bash
-pip install -r requirements.txt
+pip install -r requirements.txt && playwright install chromium
 ```
 
 **Start Command:**
