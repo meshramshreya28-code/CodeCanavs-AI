@@ -1,18 +1,15 @@
-# Node
-node_modules
+# frontend
+frontend/node_modules
+frontend/dist
 
-# Python
-venv
-__pycache__
-*.pyc
+# backend
+backend/venv
+backend/__pycache__
+backend/uploads
 
-# Environment
+# env
 .env
 
-# Build
-dist
-build
-
-# OS
+# system
 .DS_Store
 Thumbs.db
