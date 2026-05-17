@@ -2,6 +2,7 @@ import os
 import uuid
 import time
 import atexit
+import concurrent.futures
 
 try:
     from playwright.sync_api import sync_playwright
@@ -40,7 +41,7 @@ def _shutdown():
 atexit.register(_shutdown)
 
 
-def capture_website(url: str):
+def _capture_website(url: str):
 
     # Generate unique image name
     if not PLAYWRIGHT_AVAILABLE:
@@ -54,8 +55,8 @@ def capture_website(url: str):
 
     # Create page
     page = browser.new_page(viewport={"width": 1366, "height": 768})
-    # Slightly higher navigation timeout but avoid relaunch overhead
     page.set_default_navigation_timeout(20000)
+    page.set_default_timeout(25000)
 
     # Open website (wait for domcontentloaded only)
     page.goto(url, wait_until="domcontentloaded", timeout=20000)
@@ -70,3 +71,18 @@ def capture_website(url: str):
         pass
 
     return filepath
+
+
+def capture_website(url: str, timeout: int = 25):
+    """Capture a website screenshot with a thread-based timeout to avoid hanging.
+
+    Raises RuntimeError if capture times out or Playwright is unavailable.
+    """
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
+        future = executor.submit(_capture_website, url)
+        try:
+            return future.result(timeout=timeout)
+        except concurrent.futures.TimeoutError:
+            raise RuntimeError("Screenshot capture timed out")
+        except Exception:
+            raise
