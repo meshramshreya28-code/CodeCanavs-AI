@@ -23,10 +23,13 @@ def health_check():
 
 @router.post("/analyze/url")
 def analyze_url(request: AnalyzeRequest):
-
-    url = request.url
+    url = request.url.strip()
     if not url:
         raise HTTPException(status_code=400, detail="Missing url")
+
+    # Add https:// if missing
+    if not url.startswith("http://") and not url.startswith("https://"):
+        url = "https://" + url
 
     logger.info("Received analyze request for URL: %s", url)
 
@@ -37,11 +40,14 @@ def analyze_url(request: AnalyzeRequest):
         if time.time() - ts < CACHE_TTL:
             result = result.copy()
             result["analysis_mode"] = result.get("analysis_mode", "cached")
+            logger.info("Returning cached result for %s", url)
             return result
 
-    # Step 1: take screenshot
+    # Step 1: screenshot — 60s timeout to handle Render cold starts
     try:
-        screenshot_path = capture_website(url, timeout=25)
+        logger.info("Starting screenshot capture for %s", url)
+        screenshot_path = capture_website(url, timeout=60)
+        logger.info("Screenshot captured: %s", screenshot_path)
 
         # Step 2: AI analysis
         result = analyze_ui(screenshot_path)
@@ -49,19 +55,14 @@ def analyze_url(request: AnalyzeRequest):
             raise RuntimeError("No result from AI analysis")
         result["analysis_mode"] = result.get("analysis_mode", "ai")
         logger.info("Analysis completed for %s", url)
+
         # Cache successful result
-        try:
-            CACHE[url] = (result.copy(), time.time())
-        except Exception:
-            pass
+        CACHE[url] = (result.copy(), time.time())
+
     except Exception as exc:
-        logger.exception("Analysis failed for %s", url)
+        logger.exception("Analysis failed for %s: %s", url, exc)
         result = basic_ui_score_analysis()
         result["analysis_mode"] = "fallback"
-        try:
-            CACHE[url] = (result.copy(), time.time())
-        except Exception:
-            pass
+        CACHE[url] = (result.copy(), time.time())
 
-    # Step 3: return ONLY JSON
     return result

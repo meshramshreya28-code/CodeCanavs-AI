@@ -1,88 +1,91 @@
 import os
 import uuid
-import time
-import atexit
-import concurrent.futures
+import asyncio
+import logging
+
+logger = logging.getLogger("backend.services.screenshot")
 
 try:
-    from playwright.sync_api import sync_playwright
+    from playwright.async_api import async_playwright
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
-    sync_playwright = None
     PLAYWRIGHT_AVAILABLE = False
+    logger.warning("Playwright not installed — screenshots disabled")
 
-# Keep a persistent Playwright/browser instance to avoid launching per-request
+# Persistent browser instance (created once, reused across requests)
 _playwright = None
 _browser = None
+_browser_lock = asyncio.Lock()
 
 
-def _ensure_browser():
+async def _ensure_browser():
     global _playwright, _browser
-    if not PLAYWRIGHT_AVAILABLE:
-        raise RuntimeError("Playwright is not installed")
-    if _browser is None:
-        # start playwright once
-        _playwright = sync_playwright().start()
-        _browser = _playwright.chromium.launch(headless=True, args=["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"], timeout=30000)
+    async with _browser_lock:
+        if _browser is None:
+            logger.info("Launching Chromium (first time — may take 30s on cold start)...")
+            _playwright = await async_playwright().start()
+            _browser = await _playwright.chromium.launch(
+                headless=True,
+                args=[
+                    "--no-sandbox",
+                    "--disable-setuid-sandbox",
+                    "--disable-dev-shm-usage",
+                    "--disable-gpu",
+                    "--single-process",          # important for Render free tier
+                    "--no-zygote",
+                ],
+            )
+            logger.info("Chromium launched successfully.")
     return _browser
 
 
-def _shutdown():
-    global _playwright, _browser
-    try:
-        if _browser:
-            _browser.close()
-        if _playwright:
-            _playwright.stop()
-    except Exception:
-        pass
-
-
-atexit.register(_shutdown)
-
-
-def _capture_website(url: str):
-
-    # Generate unique image name
+async def _capture_async(url: str) -> str:
     if not PLAYWRIGHT_AVAILABLE:
         raise RuntimeError("Playwright is not installed")
 
+    # Ensure uploads directory exists
+    upload_dir = "/tmp/uploads"
+    os.makedirs(upload_dir, exist_ok=True)
+
     filename = f"{uuid.uuid4()}.png"
-    filepath = f"uploads/{filename}"
-    os.makedirs(os.path.dirname(filepath), exist_ok=True)
+    filepath = os.path.join(upload_dir, filename)
 
-    browser = _ensure_browser()
+    browser = await _ensure_browser()
 
-    # Create page
-    page = browser.new_page(viewport={"width": 1366, "height": 768})
-    page.set_default_navigation_timeout(20000)
-    page.set_default_timeout(25000)
-
-    # Open website (wait for domcontentloaded only)
-    page.goto(url, wait_until="domcontentloaded", timeout=20000)
-
-    # Take screenshot (limit to viewport to speed up)
-    page.screenshot(path=filepath, full_page=False)
-
-    # Close page but keep browser alive
+    page = await browser.new_page(viewport={"width": 1366, "height": 768})
     try:
-        page.close()
-    except Exception:
-        pass
+        await page.goto(url, wait_until="domcontentloaded", timeout=30000)
+        await page.screenshot(path=filepath, full_page=False)
+        logger.info("Screenshot saved: %s", filepath)
+        return filepath
+    finally:
+        await page.close()
 
-    return filepath
 
-
-def capture_website(url: str, timeout: int = 25):
-    """Capture a website screenshot with a thread-based timeout to avoid hanging.
-
-    Raises RuntimeError if capture times out or Playwright is unavailable.
+def capture_website(url: str, timeout: int = 60) -> str:
     """
-    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as executor:
-        future = executor.submit(_capture_website, url)
-        try:
-            return future.result(timeout=timeout)
-        except concurrent.futures.TimeoutError:
-            raise RuntimeError("Screenshot capture timed out")
-        except Exception:
-            raise
+    Synchronous wrapper around the async capture function.
+    Uses asyncio.run() so it works from FastAPI sync routes too.
+    Timeout is 60s to handle Render cold starts.
+    """
+    if not PLAYWRIGHT_AVAILABLE:
+        raise RuntimeError("Playwright is not installed")
+
+    try:
+        # If there's already a running event loop (e.g. inside async context), use it
+        loop = asyncio.get_event_loop()
+        if loop.is_running():
+            # We're inside an async context — run in a new thread loop
+            import concurrent.futures
+            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+                future = pool.submit(asyncio.run, _capture_async(url))
+                return future.result(timeout=timeout)
+        else:
+            return loop.run_until_complete(
+                asyncio.wait_for(_capture_async(url), timeout=timeout)
+            )
+    except asyncio.TimeoutError:
+        raise RuntimeError(f"Screenshot timed out after {timeout}s for URL: {url}")
+    except Exception as e:
+        logger.exception("Screenshot failed for %s", url)
+        raise
