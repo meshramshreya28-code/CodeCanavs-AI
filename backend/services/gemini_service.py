@@ -12,7 +12,7 @@ try:
     api_key = os.getenv("GEMINI_API_KEY")
     logger.info("GEMINI_API_KEY present: %s", bool(api_key))
     genai.configure(api_key=api_key)
-    model = genai.GenerativeModel("gemini-1.5-flash-002")
+    model = genai.GenerativeModel("gemini-1.5-flash")
     AI_ENABLED = True
     logger.info("Gemini AI enabled.")
 except Exception as e:
