@@ -5,23 +5,24 @@ import logging
 
 logger = logging.getLogger("backend.services.gemini")
 
+AI_ENABLED = False
+client = None
+
 try:
-    import google.generativeai as genai
+    from google import genai
+    from google.genai import types
     from dotenv import load_dotenv
 
     load_dotenv()
     api_key = os.getenv("GEMINI_API_KEY")
     if api_key:
-        genai.configure(api_key=api_key)
-        model = genai.GenerativeModel("gemini-1.5-flash-latest")
+        client = genai.Client(api_key=api_key)
         AI_ENABLED = True
-        logger.info("Gemini AI enabled with gemini-1.5-flash-latest")
+        logger.info("Gemini AI enabled (google-genai SDK, gemini-2.0-flash)")
     else:
-        AI_ENABLED = False
-        logger.warning("GEMINI_API_KEY not set — AI disabled, using fallback")
+        logger.warning("GEMINI_API_KEY not set — using fallback scores")
 except Exception as e:
-    AI_ENABLED = False
-    logger.warning("Gemini import failed: %s", e)
+    logger.warning("Gemini SDK import failed: %s", e)
 
 
 def basic_ui_score_analysis():
@@ -33,7 +34,8 @@ def basic_ui_score_analysis():
             "Improve spacing consistency",
             "Increase CTA visibility",
             "Use better contrast for text",
-            "Improve font hierarchy"
+            "Improve font hierarchy",
+            "Ensure mobile responsiveness"
         ],
         "accessibility": ["Check color contrast ratios", "Add alt text for images"],
         "color_palette": ["#000000", "#FFFFFF", "#F5F5F5"],
@@ -43,21 +45,19 @@ def basic_ui_score_analysis():
 
 def analyze_ui(image_path):
     if not AI_ENABLED:
-        logger.warning("AI not enabled — using fallback scores")
+        logger.warning("AI not enabled — using fallback")
         result = basic_ui_score_analysis()
         result["analysis_mode"] = "fallback"
         return result
 
     try:
-        logger.info("Reading image for Gemini: %s", image_path)
-
-        # Read image as base64 and send inline — more reliable than upload_file
+        logger.info("Reading screenshot: %s", image_path)
         with open(image_path, "rb") as f:
-            image_data = base64.b64encode(f.read()).decode("utf-8")
+            image_bytes = f.read()
 
         prompt = """Analyze this website UI screenshot carefully.
 
-Return ONLY valid JSON. No markdown, no backticks, no explanation.
+Return ONLY valid JSON. No markdown, no backticks, no explanation before or after.
 
 Evaluate:
 - Visual hierarchy and layout structure
@@ -66,29 +66,29 @@ Evaluate:
 - Color scheme and contrast ratios
 - Accessibility issues
 - CTA (call-to-action) visibility
-- Overall UX quality
+- Overall UX quality and friction points
 
-Return exactly this JSON:
+Return exactly this JSON structure:
 {
   "ui_score": <integer 0-100>,
   "ux_score": <integer 0-100>,
-  "summary": "<2-3 sentence summary of the overall design>",
+  "summary": "<2-3 sentence overall design quality summary>",
   "suggestions": ["<improvement 1>", "<improvement 2>", "<improvement 3>", "<improvement 4>", "<improvement 5>"],
-  "accessibility": ["<accessibility issue 1>", "<accessibility issue 2>"],
-  "color_palette": ["<dominant hex color 1>", "<hex color 2>", "<hex color 3>"],
-  "font_pairings": ["<detected font style description>"]
+  "accessibility": ["<issue 1>", "<issue 2>"],
+  "color_palette": ["<hex1>", "<hex2>", "<hex3>"],
+  "font_pairings": ["<detected font style>"]
 }"""
 
-        response = model.generate_content([
-            prompt,
-            {
-                "mime_type": "image/png",
-                "data": image_data
-            }
-        ])
+        response = client.models.generate_content(
+            model="gemini-2.0-flash",
+            contents=[
+                types.Part.from_text(text=prompt),
+                types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
+            ]
+        )
 
         if not response or not response.text:
-            logger.warning("Empty response from Gemini — using fallback")
+            logger.warning("Empty Gemini response — fallback")
             result = basic_ui_score_analysis()
             result["analysis_mode"] = "fallback"
             return result
@@ -96,11 +96,11 @@ Return exactly this JSON:
         cleaned = response.text.strip().replace("```json", "").replace("```", "").strip()
         parsed = json.loads(cleaned)
         parsed["analysis_mode"] = "ai"
-        logger.info("Gemini done — UI: %s UX: %s", parsed.get("ui_score"), parsed.get("ux_score"))
+        logger.info("Gemini success — UI: %s UX: %s", parsed.get("ui_score"), parsed.get("ux_score"))
         return parsed
 
     except json.JSONDecodeError as e:
-        logger.exception("JSON parse error: %s", e)
+        logger.exception("JSON parse error from Gemini: %s", e)
         result = basic_ui_score_analysis()
         result["analysis_mode"] = "fallback"
         return result
