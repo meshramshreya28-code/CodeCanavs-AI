@@ -1,21 +1,25 @@
 import os
 import json
+import logging
+
+logger = logging.getLogger("backend.services.gemini")
 
 try:
     import google.generativeai as genai
     from dotenv import load_dotenv
 
     load_dotenv()
-    genai.configure(api_key=os.getenv("GEMINI_API_KEY"))
+    api_key = os.getenv("GEMINI_API_KEY")
+    logger.info("GEMINI_API_KEY present: %s", bool(api_key))
+    genai.configure(api_key=api_key)
     model = genai.GenerativeModel("gemini-1.5-flash-002")
     AI_ENABLED = True
-except Exception:
+    logger.info("Gemini AI enabled.")
+except Exception as e:
+    logger.warning("Gemini init failed: %s", e)
     AI_ENABLED = False
 
 
-# ---------------------------
-# FALLBACK ANALYSIS (SMART)
-# ---------------------------
 def basic_ui_score_analysis():
     return {
         "ui_score": 65,
@@ -36,17 +40,17 @@ def basic_ui_score_analysis():
     }
 
 
-# ---------------------------
-# MAIN AI FUNCTION
-# ---------------------------
 def analyze_ui(image_path):
     if not AI_ENABLED:
+        logger.warning("AI not enabled, using fallback.")
         result = basic_ui_score_analysis()
         result["analysis_mode"] = "fallback"
         return result
 
     try:
+        logger.info("Uploading image to Gemini: %s", image_path)
         uploaded_file = genai.upload_file(image_path)
+        logger.info("Image uploaded, sending to model...")
 
         prompt = """
         Analyze this website UI screenshot.
@@ -77,8 +81,10 @@ def analyze_ui(image_path):
         """
 
         response = model.generate_content([prompt, uploaded_file])
+        logger.info("Gemini response received.")
 
         if not response or not response.text:
+            logger.warning("Empty response from Gemini.")
             result = basic_ui_score_analysis()
             result["analysis_mode"] = "fallback"
             return result
@@ -86,12 +92,11 @@ def analyze_ui(image_path):
         cleaned = response.text.replace("```json", "").replace("```", "")
         parsed = json.loads(cleaned)
         parsed["analysis_mode"] = "ai"
+        logger.info("AI analysis successful.")
         return parsed
 
-
-    except Exception:
-        # IMPORTANT FIX:
-        # Always fallback to smart analysis instead of raw error
+    except Exception as e:
+        logger.exception("Gemini analysis failed: %s", e)
         result = basic_ui_score_analysis()
         result["analysis_mode"] = "fallback"
         return result
