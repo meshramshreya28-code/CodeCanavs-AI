@@ -2,6 +2,10 @@ import os
 import uuid
 import asyncio
 import logging
+import subprocess
+
+# Force Playwright to use a writable path on Render
+os.environ["PLAYWRIGHT_BROWSERS_PATH"] = "/opt/render/project/src/.cache/ms-playwright"
 
 logger = logging.getLogger("backend.services.screenshot")
 
@@ -20,6 +24,19 @@ async def _get_browser():
     global _browser, _playwright
     if _browser is None:
         logger.info("Launching Chromium...")
+        
+        # Install browser if missing
+        try:
+            result = subprocess.run(
+                ["playwright", "install", "chromium"],
+                capture_output=True, text=True, timeout=120
+            )
+            logger.info("Playwright install output: %s", result.stdout)
+            if result.returncode != 0:
+                logger.warning("Playwright install stderr: %s", result.stderr)
+        except Exception as e:
+            logger.warning("Could not run playwright install: %s", e)
+
         _playwright = await async_playwright().start()
         _browser = await _playwright.chromium.launch(
             headless=True,
@@ -56,17 +73,12 @@ async def _capture_async(url: str) -> str:
 
 
 def capture_website(url: str, timeout: int = 60) -> str:
-    """
-    Always spawns a fresh event loop in a new thread.
-    This avoids the 'no current event loop' error in AnyIO/uvloop worker threads.
-    """
     if not PLAYWRIGHT_AVAILABLE:
         raise RuntimeError("Playwright not installed")
 
     import concurrent.futures
 
     def run_in_new_loop():
-        # Each thread gets its own fresh event loop — no conflict with uvloop
         loop = asyncio.new_event_loop()
         asyncio.set_event_loop(loop)
         try:
