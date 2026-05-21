@@ -48,9 +48,9 @@ def analyze_ui(image_path):
         return result
 
     try:
-        logger.info("Uploading image to Gemini: %s", image_path)
-        uploaded_file = genai.upload_file(image_path)
-        logger.info("Image uploaded, sending to model...")
+        logger.info("Reading image: %s", image_path)
+        import PIL.Image
+        image = PIL.Image.open(image_path)
 
         prompt = """
         Analyze this website UI screenshot.
@@ -80,7 +80,7 @@ def analyze_ui(image_path):
         }
         """
 
-        response = model.generate_content([prompt, uploaded_file])
+        response = model.generate_content([prompt, image])
         logger.info("Gemini response received.")
 
         if not response or not response.text:
@@ -89,7 +89,7 @@ def analyze_ui(image_path):
             result["analysis_mode"] = "fallback"
             return result
 
-        cleaned = response.text.replace("```json", "").replace("```", "")
+        cleaned = response.text.replace("```json", "").replace("```", "").strip()
         parsed = json.loads(cleaned)
         parsed["analysis_mode"] = "ai"
         logger.info("AI analysis successful.")
