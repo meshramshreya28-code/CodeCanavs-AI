@@ -10,48 +10,41 @@ try:
     PLAYWRIGHT_AVAILABLE = True
 except ImportError:
     PLAYWRIGHT_AVAILABLE = False
-    logger.warning("Playwright not installed — screenshots disabled")
+    logger.warning("Playwright not installed")
 
-# Persistent browser instance (created once, reused across requests)
-_playwright = None
 _browser = None
-_browser_lock = asyncio.Lock()
+_playwright = None
 
 
-async def _ensure_browser():
-    global _playwright, _browser
-    async with _browser_lock:
-        if _browser is None:
-            logger.info("Launching Chromium (first time — may take 30s on cold start)...")
-            _playwright = await async_playwright().start()
-            _browser = await _playwright.chromium.launch(
-                headless=True,
-                args=[
-                    "--no-sandbox",
-                    "--disable-setuid-sandbox",
-                    "--disable-dev-shm-usage",
-                    "--disable-gpu",
-                    "--single-process",          # important for Render free tier
-                    "--no-zygote",
-                ],
-            )
-            logger.info("Chromium launched successfully.")
+async def _get_browser():
+    global _browser, _playwright
+    if _browser is None:
+        logger.info("Launching Chromium...")
+        _playwright = await async_playwright().start()
+        _browser = await _playwright.chromium.launch(
+            headless=True,
+            args=[
+                "--no-sandbox",
+                "--disable-setuid-sandbox",
+                "--disable-dev-shm-usage",
+                "--disable-gpu",
+                "--single-process",
+                "--no-zygote",
+            ],
+        )
+        logger.info("Chromium launched.")
     return _browser
 
 
 async def _capture_async(url: str) -> str:
     if not PLAYWRIGHT_AVAILABLE:
-        raise RuntimeError("Playwright is not installed")
+        raise RuntimeError("Playwright not installed")
 
-    # Ensure uploads directory exists
     upload_dir = "/tmp/uploads"
     os.makedirs(upload_dir, exist_ok=True)
+    filepath = os.path.join(upload_dir, f"{uuid.uuid4()}.png")
 
-    filename = f"{uuid.uuid4()}.png"
-    filepath = os.path.join(upload_dir, filename)
-
-    browser = await _ensure_browser()
-
+    browser = await _get_browser()
     page = await browser.new_page(viewport={"width": 1366, "height": 768})
     try:
         await page.goto(url, wait_until="domcontentloaded", timeout=30000)
@@ -64,28 +57,28 @@ async def _capture_async(url: str) -> str:
 
 def capture_website(url: str, timeout: int = 60) -> str:
     """
-    Synchronous wrapper around the async capture function.
-    Uses asyncio.run() so it works from FastAPI sync routes too.
-    Timeout is 60s to handle Render cold starts.
+    Always spawns a fresh event loop in a new thread.
+    This avoids the 'no current event loop' error in AnyIO/uvloop worker threads.
     """
     if not PLAYWRIGHT_AVAILABLE:
-        raise RuntimeError("Playwright is not installed")
+        raise RuntimeError("Playwright not installed")
 
-    try:
-        # If there's already a running event loop (e.g. inside async context), use it
-        loop = asyncio.get_event_loop()
-        if loop.is_running():
-            # We're inside an async context — run in a new thread loop
-            import concurrent.futures
-            with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
-                future = pool.submit(asyncio.run, _capture_async(url))
-                return future.result(timeout=timeout)
-        else:
+    import concurrent.futures
+
+    def run_in_new_loop():
+        # Each thread gets its own fresh event loop — no conflict with uvloop
+        loop = asyncio.new_event_loop()
+        asyncio.set_event_loop(loop)
+        try:
             return loop.run_until_complete(
                 asyncio.wait_for(_capture_async(url), timeout=timeout)
             )
-    except asyncio.TimeoutError:
-        raise RuntimeError(f"Screenshot timed out after {timeout}s for URL: {url}")
-    except Exception as e:
-        logger.exception("Screenshot failed for %s", url)
-        raise
+        finally:
+            loop.close()
+
+    with concurrent.futures.ThreadPoolExecutor(max_workers=1) as pool:
+        future = pool.submit(run_in_new_loop)
+        try:
+            return future.result(timeout=timeout + 5)
+        except concurrent.futures.TimeoutError:
+            raise RuntimeError(f"Screenshot timed out after {timeout}s")
