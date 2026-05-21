@@ -36,30 +36,29 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
-/* ── ANIMATED BACKGROUND ── */
-.animated-bg {
+/* ── THREE.JS CANVAS ── */
+#three-bg {
   position: fixed;
   inset: 0;
-  z-index: -5;
-  background:
-    radial-gradient(ellipse 80% 50% at 10% 0%,   rgba(56,189,248,0.07)  0%, transparent 60%),
-    radial-gradient(ellipse 60% 40% at 90% 10%,  rgba(34,197,94,0.06)   0%, transparent 55%),
-    radial-gradient(ellipse 70% 60% at 50% 100%, rgba(167,139,250,0.06) 0%, transparent 60%),
-    linear-gradient(180deg, #020408 0%, #060b14 50%, #04080f 100%);
+  z-index: 0;
+  pointer-events: none;
 }
 
+/* ── SUBTLE GRID OVERLAY ── */
 .background-grid {
   position: fixed;
   inset: 0;
-  z-index: -4;
+  z-index: 1;
+  pointer-events: none;
   background-image:
-    linear-gradient(rgba(56,189,248,0.04) 1px, transparent 1px),
-    linear-gradient(90deg, rgba(56,189,248,0.04) 1px, transparent 1px);
+    linear-gradient(rgba(56,189,248,0.03) 1px, transparent 1px),
+    linear-gradient(90deg, rgba(56,189,248,0.03) 1px, transparent 1px);
   background-size: 60px 60px;
   mask-image: radial-gradient(ellipse 80% 80% at 50% 50%, black 30%, transparent 100%);
 }
 
 /* ── HIDE LEGACY DECORATIONS ── */
+.animated-bg,
 .scene, .bg-particles, .line-trails,
 .wave-bg, .wave, .particle-canvas { display: none !important; }
 
@@ -131,7 +130,7 @@ h1.site-title span {
   letter-spacing: 0.01em;
 }
 
-/* ── STATUS INDICATOR ── */
+/* ── STATUS ── */
 .status-bar {
   display: flex;
   align-items: center;
@@ -165,13 +164,7 @@ h1.site-title span {
   color: #fbbf24;
 }
 
-.status-pip {
-  width: 6px;
-  height: 6px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
+.status-pip { width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
 .status-pip.live { animation: blink 1.4s ease-in-out infinite; }
 
 @keyframes blink {
@@ -231,11 +224,7 @@ h1.site-title span {
 }
 
 .analyze-btn:active:not(:disabled) { transform: translateY(0); }
-
-.analyze-btn:disabled {
-  opacity: 0.5;
-  cursor: not-allowed;
-}
+.analyze-btn:disabled { opacity: 0.5; cursor: not-allowed; }
 
 /* ── LOADING CARD ── */
 .loading-card {
@@ -258,9 +247,7 @@ h1.site-title span {
   margin: 0 auto 20px;
 }
 
-@keyframes spin {
-  to { transform: rotate(360deg); }
-}
+@keyframes spin { to { transform: rotate(360deg); } }
 
 .loading-step-text {
   display: flex;
@@ -316,10 +303,8 @@ h1.site-title span {
   text-align: center;
 }
 
-/* ── RESULT CARD ── */
-.result-wrapper {
-  margin-bottom: 40px;
-}
+/* ── RESULT ── */
+.result-wrapper { margin-bottom: 40px; }
 
 .result-header {
   display: flex;
@@ -353,7 +338,6 @@ h1.site-title span {
   color: var(--accent-blue);
 }
 
-/* Score boxes */
 .score-grid {
   display: grid;
   grid-template-columns: 1fr 1fr;
@@ -420,7 +404,6 @@ h1.site-title span {
 .score-box.ui .score-bar-fill  { background: var(--accent-blue); }
 .score-box.ux .score-bar-fill  { background: var(--accent-green); }
 
-/* Summary */
 .summary-block {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
@@ -446,7 +429,6 @@ h1.site-title span {
   color: var(--text-secondary);
 }
 
-/* Suggestions */
 .suggestions-block {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
@@ -491,7 +473,6 @@ h1.site-title span {
   flex-shrink: 0;
 }
 
-/* Chart */
 .chart-block {
   background: var(--bg-elevated);
   border: 1px solid var(--border-subtle);
@@ -547,11 +528,7 @@ h1.site-title span {
   min-width: 0;
 }
 
-.history-scores {
-  display: flex;
-  gap: 10px;
-  flex-shrink: 0;
-}
+.history-scores { display: flex; gap: 10px; flex-shrink: 0; }
 
 .score-chip {
   font-family: var(--font-mono);
@@ -575,22 +552,17 @@ h1.site-title span {
   letter-spacing: 0.04em;
 }
 
-/* ── BUTTON RESET ── */
 button:hover { transform: none; transition: none; }
 
 /* ── MOBILE ── */
 @media (max-width: 640px) {
   .content { padding: 40px 16px 60px; }
-
   h1.site-title { font-size: 30px; }
-
   .search-card { padding: 6px 6px 6px 14px; }
   .search-card input { font-size: 13px; }
   .analyze-btn { padding: 10px 16px; font-size: 13px; }
-
   .score-grid { grid-template-columns: 1fr 1fr; gap: 10px; }
   .score-value { font-size: 34px; }
-
   .result-header { flex-direction: column; align-items: flex-start; }
 }
 
