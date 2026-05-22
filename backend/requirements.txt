@@ -1,6 +1,7 @@
 fastapi==0.115.0
-uvicorn==0.30.6
-playwright==1.52.0
-python-multipart==0.0.9
-google-genai==1.14.0
-anyio==4.9.0
+starlette==0.38.6
+uvicorn
+python-dotenv
+google-genai
+playwright
+python-multipart
