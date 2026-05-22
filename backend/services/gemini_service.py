@@ -105,7 +105,30 @@ Return exactly this JSON structure:
         result["analysis_mode"] = "fallback"
         return result
     except Exception as e:
-        logger.exception("Gemini analysis failed: %s", e)
-        result = basic_ui_score_analysis()
-        result["analysis_mode"] = "fallback"
-        return result
+        logger.warning(f"Gemini failed: {e}")
+
+    return {
+        "ui_score": 70,
+        "ux_score": 68,
+        "summary": "AI quota exceeded. Showing fallback UI analysis.",
+        "suggestions": [
+            "Improve button visibility",
+            "Use consistent spacing",
+            "Enhance typography hierarchy",
+            "Optimize mobile responsiveness",
+            "Improve accessibility contrast"
+        ],
+        "accessibility": [
+            "Improve color contrast",
+            "Add proper alt text"
+        ],
+        "color_palette": [
+            "#0f172a",
+            "#38bdf8",
+            "#22c55e"
+        ],
+        "font_pairings": [
+            "Inter + Poppins"
+        ],
+        "analysis_mode": "fallback"
+    }
