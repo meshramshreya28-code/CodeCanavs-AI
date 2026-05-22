@@ -4,5 +4,3 @@ playwright==1.52.0
 python-multipart==0.0.9
 google-genai==1.14.0
 anyio==4.9.0
-pydantic==2.11.4
-starlette==0.46.2
