@@ -2,6 +2,7 @@ fastapi==0.115.0
 starlette==0.38.6
 uvicorn
 python-dotenv
-google-genai
+google-genai>=1.14.0
 playwright
 python-multipart
+pillow
