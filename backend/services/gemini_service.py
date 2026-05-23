@@ -80,7 +80,7 @@ Return exactly this JSON structure:
 }"""
 
         response = client.models.generate_content(
-            model="gemini-1.5-flash",
+           model="gemini-2.5-flash",
             contents=[
                 types.Part.from_text(text=prompt),
                 types.Part.from_bytes(data=image_bytes, mime_type="image/png"),
