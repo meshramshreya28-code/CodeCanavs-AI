@@ -1,39 +1,98 @@
-# 🚀 CodeCanvas AI
+# 🚀 CodeCanvas AI — UI/UX Analyzer
 
-CodeCanvas AI is an AI-powered UI/UX website analyzer built with React, FastAPI, and Playwright.
+> An AI-powered tool that analyzes any website's UI & UX quality in seconds using Google Gemini Vision + Playwright screenshots.
 
-It analyzes website interfaces and provides:
+![CodeCanvas AI](https://codecanavs-ai-1.onrender.com)
 
-* 🎨 UI Score
-* 🧠 UX Score
-* 💡 Improvement Suggestions
-* 📊 Visual Analytics
-* ✨ Modern Interactive Dashboard
+---
+
+## ✨ Features
+
+- 🌐 **Live Website Screenshot** — captures any URL using headless Chromium via Playwright
+- 🧠 **AI-Powered Analysis** — sends screenshot to Google Gemini 2.5 Flash for deep UI/UX evaluation
+- 📊 **UI & UX Scores** — get scores out of 100 for both UI quality and UX experience
+- 💡 **Design Suggestions** — actionable improvement recommendations
+- ♿ **Accessibility Issues** — highlights contrast, alt text, and other a11y problems
+- 🎨 **Color Palette Detection** — extracts dominant colors from the website
+- 📝 **Analysis History** — tracks all previously analyzed URLs in the session
+- 🌌 **3D Animated Background** — Three.js powered interactive background with mouse parallax
 
 ---
 
 ## 🛠️ Tech Stack
 
 ### Frontend
-
-* React.js
-* Vite
-* Axios
-* Recharts
-* Framer Motion
+| Tech | Purpose |
+|------|---------|
+| React + Vite | UI framework |
+| Framer Motion | Animations |
+| Three.js | 3D background |
+| Recharts | Score donut chart |
+| Axios | API calls |
 
 ### Backend
+| Tech | Purpose |
+|------|---------|
+| FastAPI | REST API |
+| Playwright | Headless browser screenshots |
+| Google Gemini 2.5 Flash | AI vision analysis |
+| Python-dotenv | Environment config |
 
-* FastAPI
-* Python
-* Playwright
-* Uvicorn
+### Deployment
+- **Frontend** → Render Static Site
+- **Backend** → Render Web Service
 
 ---
 
-## ⚙️ Setup
+## 🚀 Live Demo
 
-### Frontend
+🔗 **[codecanavs-ai-1.onrender.com](https://codecanavs-ai-1.onrender.com)**
+
+> ⚠️ Hosted on Render free tier — first request may take 30–60s to wake up the backend.
+
+---
+
+## 📦 Getting Started
+
+### Prerequisites
+- Node.js 18+
+- Python 3.11+
+- A [Google Gemini API key](https://aistudio.google.com)
+
+### 1. Clone the repo
+
+```bash
+git clone https://github.com/meshramshreya28-code/CodeCanavs-AI.git
+cd CodeCanavs-AI
+```
+
+### 2. Backend Setup
+
+```bash
+cd backend
+python -m venv venv
+venv\Scripts\activate        # Windows
+# source venv/bin/activate   # Mac/Linux
+
+pip install -r requirements.txt
+playwright install chromium
+```
+
+Create a `.env` file in the `backend/` folder:
+
+```env
+GEMINI_API_KEY=your_gemini_api_key_here
+```
+
+Start the backend:
+
+```bash
+uvicorn main:app --reload
+```
+
+Backend runs at `http://localhost:8000`
+
+### 3. Frontend Setup
 
 ```bash
 cd frontend
@@ -41,80 +100,58 @@ npm install
 npm run dev
 ```
 
-### Backend
+Frontend runs at `http://localhost:5173`
 
-```bash
-cd backend
+---
 
-python -m venv venv
-venv\Scripts\activate
+## 📁 Project Structure
 
-pip install -r requirements.txt
-playwright install
-
-uvicorn main:app --reload
+```
+CodeCanavs-AI/
+├── backend/
+│   ├── main.py                  # FastAPI app entry point
+│   ├── requirements.txt
+│   ├── .env                     # API keys (not committed)
+│   ├── routes/
+│   │   └── screenshot.py        # /analyze/url endpoint
+│   └── services/
+│       ├── screenshot_service.py  # Playwright screenshot logic
+│       └── gemini_service.py      # Gemini AI analysis
+│
+└── frontend/
+    ├── src/
+    │   ├── App.jsx              # Main React component
+    │   └── App.css              # Styles
+    └── package.json
 ```
 
 ---
 
-## 🌐 Local URLs
+## 🔑 Environment Variables
 
-Frontend:
-
-```bash
-http://localhost:5173
-```
-
-Backend:
-
-```bash
-http://127.0.0.1:8000
-```
+| Variable | Description |
+|----------|-------------|
+| `GEMINI_API_KEY` | Your Google Gemini API key from [aistudio.google.com](https://aistudio.google.com) |
 
 ---
 
-## � Render Deployment
+## 📸 How It Works
 
-### Backend (FastAPI - Web Service)
-
-**Build Command:**
-```bash
-pip install -r requirements.txt && playwright install chromium
-```
-
-**Start Command:**
-```bash
-uvicorn main:app --host 0.0.0.0 --port $PORT
-```
-
-**Environment Variables:**
-```
-PYTHON_VERSION=3.11
-```
+1. User enters a website URL
+2. Backend launches headless Chromium via Playwright and takes a screenshot
+3. Screenshot is sent to Google Gemini 2.5 Flash Vision API
+4. Gemini analyzes the UI/UX and returns structured JSON scores
+5. Frontend displays scores, suggestions, and a donut chart
 
 ---
 
-### Frontend (React/Vite - Static Site)
+## 🙌 Author
 
-**Build Command:**
-```bash
-npm install && npm run build
-```
-
-**Publish Directory:**
-```
-dist
-```
-
-**Environment Variables:**
-```
-VITE_BACKEND_URL=https://your-backend-url.onrender.com
-```
+**Shreya Meshram**  
+Built with ❤️ using React, FastAPI, and Google Gemini AI
 
 ---
 
-## �👩‍💻 Author
+## 📄 License
 
-Shreya Meshram
-
-Built with ❤️ using React & FastAPI.
+MIT License — feel free to use and modify!
