@@ -2,7 +2,7 @@
 
 > An AI-powered tool that analyzes any website's UI & UX quality in seconds using Google Gemini Vision + Playwright screenshots.
 
-![CodeCanvas AI](https://codecanavs-ai-1.onrender.com)
+![CodeCanvas AI](https://codecanavs-ai-1.onrender.com/)
 
 ---
 
